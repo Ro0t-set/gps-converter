@@ -347,63 +347,6 @@
     50% { opacity: 0.5; }
   }
 
-  /* Saved list */
-  .saved-item {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 14px;
-    margin-bottom: 8px;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-  }
-
-  .saved-item-info { flex: 1; }
-
-  .saved-item-name {
-    font-size: 14px;
-    font-weight: 600;
-    margin-bottom: 4px;
-  }
-
-  .saved-item-coords {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    color: var(--text-dim);
-    line-height: 1.6;
-  }
-
-  .saved-item-time {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 4px;
-  }
-
-  .saved-item-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-left: 10px;
-  }
-
-  .icon-btn {
-    width: 36px; height: 36px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text-dim);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-
-  .icon-btn:active { background: var(--border); }
-  .icon-btn svg { width: 16px; height: 16px; }
-
-  .icon-btn.delete:active { background: rgba(248, 113, 113, 0.2); color: var(--danger); }
 
   /* Map container */
   #map {
@@ -560,6 +503,88 @@
     border-radius: 100px;
     margin-top: 6px;
   }
+
+  /* Home screen */
+  .home-screen {
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: calc(100dvh - 80px);
+    justify-content: center;
+  }
+
+  .home-title {
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  .home-title h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .home-title p {
+    font-size: 14px;
+    color: var(--text-dim);
+  }
+
+  .home-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 22px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .home-card:active {
+    transform: scale(0.98);
+  }
+
+  .home-card:hover {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+  }
+
+  .home-card-icon {
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .home-card-icon svg { width: 26px; height: 26px; }
+
+  .home-card-icon.convert {
+    background: var(--accent-glow);
+    color: var(--accent);
+    border: 1px solid rgba(74, 124, 255, 0.25);
+  }
+
+  .home-card-icon.gps {
+    background: var(--accent2-glow);
+    color: var(--accent2);
+    border: 1px solid rgba(52, 211, 153, 0.25);
+  }
+
+  .home-card-text h3 {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .home-card-text p {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.4;
+  }
 </style>
 </head>
 <body>
@@ -575,7 +600,7 @@
   <div class="epsg-badge">EPSG:32633</div>
 </div>
 
-<div class="tabs">
+<div class="tabs" id="main-tabs" style="display:none;">
   <div class="tab active" onclick="switchTab('convert')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
     Converti
@@ -584,15 +609,37 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>
     GPS
   </div>
-  <div class="tab" onclick="switchTab('saved')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
-    Salvati
-  </div>
 </div>
 
 <div class="content">
+  <!-- HOME SCREEN -->
+  <div id="home-screen" class="home-screen">
+    <div class="home-title">
+      <h2>Cosa vuoi fare?</h2>
+      <p>Scegli uno strumento per iniziare</p>
+    </div>
+    <div class="home-card" onclick="goTo('convert')">
+      <div class="home-card-icon convert">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+      </div>
+      <div class="home-card-text">
+        <h3>Convertitore</h3>
+        <p>Converti coordinate tra UTM e Lat/Lon (WGS84)</p>
+      </div>
+    </div>
+    <div class="home-card" onclick="goTo('gps')">
+      <div class="home-card-icon gps">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>
+      </div>
+      <div class="home-card-text">
+        <h3>GPS</h3>
+        <p>Rileva la tua posizione e ottieni le coordinate UTM</p>
+      </div>
+    </div>
+  </div>
+
   <!-- CONVERT PANEL -->
-  <div class="panel active" id="panel-convert">
+  <div class="panel" id="panel-convert">
     <div class="card">
       <div class="card-title">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
@@ -650,10 +697,6 @@
             <button class="btn btn-secondary btn-sm" onclick="openInMaps('latlon')">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
               Mappa
-            </button>
-            <button class="btn btn-success btn-sm" onclick="savePoint('latlon')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
-              Salva
             </button>
           </div>
         </div>
@@ -727,10 +770,6 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
               Mappa
             </button>
-            <button class="btn btn-success btn-sm" onclick="savePoint('utm')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
-              Salva
-            </button>
           </div>
         </div>
       </div>
@@ -796,7 +835,6 @@
         </div>
         <div class="result-actions">
           <button class="btn btn-secondary btn-sm" onclick="copyGPS('utm33')">Copia UTM 33N</button>
-          <button class="btn btn-success btn-sm" onclick="saveGPSPoint()">Salva punto</button>
         </div>
       </div>
 
@@ -828,25 +866,6 @@
     </div>
   </div>
 
-  <!-- SAVED PANEL -->
-  <div class="panel" id="panel-saved">
-    <div class="card">
-      <div class="card-title">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
-        Punti salvati
-      </div>
-      <div id="saved-list">
-        <div class="empty-state">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
-          <p>Nessun punto salvato.<br>Converti o usa il GPS per salvare punti.</p>
-        </div>
-      </div>
-    </div>
-    <button class="btn btn-secondary" onclick="exportSaved()" id="export-btn" style="display:none;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-      Esporta CSV
-    </button>
-  </div>
 </div>
 
 <div class="copy-toast" id="toast">Copiato!</div>
@@ -967,20 +986,23 @@ const UTM = (() => {
 let currentZone = 32;
 let outputZone = 32;
 let lastGPSLat = null, lastGPSLon = null;
-let savedPoints = JSON.parse(localStorage?.getItem?.('coord_points') || '[]') || [];
 let watchId = null;
 
 // ============================================
-// Tab switching
+// Home screen & Tab switching
 // ============================================
+function goTo(tab) {
+  document.getElementById('home-screen').style.display = 'none';
+  document.getElementById('main-tabs').style.display = '';
+  switchTab(tab);
+}
+
 function switchTab(tab) {
   document.querySelectorAll('.tab').forEach((t, i) => {
     t.classList.toggle('active', t.getAttribute('onclick').includes(tab));
   });
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('panel-' + tab).classList.add('active');
-
-  if (tab === 'saved') renderSaved();
 }
 
 // ============================================
@@ -1148,121 +1170,6 @@ function openInMaps() {
   }
 }
 
-// ============================================
-// Save points
-// ============================================
-function savePoint(type) {
-  const name = prompt('Nome del punto (opzionale):') || `Punto ${savedPoints.length + 1}`;
-  const point = {
-    name,
-    lat: lastGPSLat,
-    lon: lastGPSLon,
-    time: new Date().toISOString()
-  };
-
-  if (type === 'latlon') {
-    point.lat = parseFloat(document.getElementById('res-lat').textContent);
-    point.lon = parseFloat(document.getElementById('res-lon').textContent);
-  } else if (type === 'utm') {
-    point.lat = lastGPSLat;
-    point.lon = lastGPSLon;
-  }
-
-  savedPoints.push(point);
-  try { localStorage.setItem('coord_points', JSON.stringify(savedPoints)); } catch(e) {}
-  showToast(`"${name}" salvato!`);
-}
-
-function saveGPSPoint() {
-  const name = prompt('Nome del punto:') || `GPS ${savedPoints.length + 1}`;
-  savedPoints.push({
-    name,
-    lat: lastGPSLat,
-    lon: lastGPSLon,
-    time: new Date().toISOString()
-  });
-  try { localStorage.setItem('coord_points', JSON.stringify(savedPoints)); } catch(e) {}
-  showToast(`"${name}" salvato!`);
-}
-
-function renderSaved() {
-  const list = document.getElementById('saved-list');
-  const exportBtn = document.getElementById('export-btn');
-
-  if (savedPoints.length === 0) {
-    list.innerHTML = `<div class="empty-state">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
-      <p>Nessun punto salvato.<br>Converti o usa il GPS per salvare punti.</p>
-    </div>`;
-    exportBtn.style.display = 'none';
-    return;
-  }
-
-  exportBtn.style.display = '';
-  list.innerHTML = savedPoints.map((p, i) => {
-    const utm33 = UTM.fromLatLon(p.lat, p.lon, 33);
-    const d = new Date(p.time);
-    const timeStr = d.toLocaleDateString('it') + ' ' + d.toLocaleTimeString('it', {hour:'2-digit',minute:'2-digit'});
-    return `<div class="saved-item">
-      <div class="saved-item-info">
-        <div class="saved-item-name">${p.name}</div>
-        <div class="saved-item-coords">
-          Lat: ${p.lat?.toFixed(6)}, Lon: ${p.lon?.toFixed(6)}<br>
-          UTM 33N — X: ${utm33.easting}, Y: ${utm33.northing}
-        </div>
-        <div class="saved-item-time">${timeStr}</div>
-      </div>
-      <div class="saved-item-actions">
-        <div class="icon-btn" onclick="copySaved(${i})" title="Copia">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-        </div>
-        <div class="icon-btn" onclick="openSavedMap(${i})" title="Mappa">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-        </div>
-        <div class="icon-btn delete" onclick="deleteSaved(${i})" title="Elimina">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function copySaved(i) {
-  const p = savedPoints[i];
-  const utm33 = UTM.fromLatLon(p.lat, p.lon, 33);
-  const text = `${p.name}\nLat: ${p.lat.toFixed(7)}, Lon: ${p.lon.toFixed(7)}\nUTM 33N — X: ${utm33.easting}, Y: ${utm33.northing}`;
-  navigator.clipboard?.writeText(text).then(() => showToast('Copiato!'));
-}
-
-function openSavedMap(i) {
-  const p = savedPoints[i];
-  window.open(`https://www.google.com/maps?q=${p.lat},${p.lon}`, '_blank');
-}
-
-function deleteSaved(i) {
-  if (confirm(`Eliminare "${savedPoints[i].name}"?`)) {
-    savedPoints.splice(i, 1);
-    try { localStorage.setItem('coord_points', JSON.stringify(savedPoints)); } catch(e) {}
-    renderSaved();
-  }
-}
-
-function exportSaved() {
-  let csv = 'Nome,Latitudine,Longitudine,UTM33N_Easting,UTM33N_Northing,Data\n';
-  savedPoints.forEach(p => {
-    const utm = UTM.fromLatLon(p.lat, p.lon, 33);
-    csv += `"${p.name}",${p.lat},${p.lon},${utm.easting},${utm.northing},${p.time}\n`;
-  });
-
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `coordinate_${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('CSV esportato!');
-}
 
 // ============================================
 // Maps (Leaflet + OpenStreetMap)
