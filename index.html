@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Coordinate Tool — UTM ↔ WGS84</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0F1218;
+    --surface: #181D27;
+    --surface2: #1E2433;
+    --border: #2A3144;
+    --border-active: #4A7CFF;
+    --text: #E8ECF4;
+    --text-dim: #8B95A8;
+    --text-muted: #5A6478;
+    --accent: #4A7CFF;
+    --accent-glow: rgba(74, 124, 255, 0.15);
+    --accent2: #34D399;
+    --accent2-glow: rgba(52, 211, 153, 0.15);
+    --danger: #F87171;
+    --warning: #FBBF24;
+    --radius: 14px;
+    --radius-sm: 10px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  /* Header */
+  .header {
+    padding: 16px 20px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(20px);
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), #7C5CFC);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  .header h1 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+
+  .header-sub {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+
+  .epsg-badge {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    padding: 12px 20px;
+    gap: 6px;
+    background: var(--bg);
+    position: sticky;
+    top: 65px;
+    z-index: 99;
+  }
+
+  .tab {
+    flex: 1;
+    padding: 10px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .tab.active {
+    background: var(--accent-glow);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .tab svg { width: 16px; height: 16px; }
+
+  /* Main content */
+  .content { padding: 0 16px 100px; }
+
+  .panel { display: none; animation: fadeIn 0.25s ease; }
+  .panel.active { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 12px;
+  }
+
+  .card-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .card-title svg { width: 14px; height: 14px; }
+
+  /* Input groups */
+  .input-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .input-group {
+    flex: 1;
+    position: relative;
+  }
+
+  .input-group label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+
+  .input-group input, .input-group select {
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 500;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .input-group input:focus, .input-group select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .input-group input::placeholder {
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+  }
+
+  .input-group select {
+    appearance: none;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  /* Buttons */
+  .btn {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn svg { width: 18px; height: 18px; }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+  .btn-primary:active { transform: scale(0.98); filter: brightness(0.9); }
+
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:active { background: var(--border); }
+
+  .btn-success {
+    background: var(--accent2);
+    color: #0F1218;
+  }
+
+  .btn-sm {
+    padding: 10px 14px;
+    font-size: 13px;
+    width: auto;
+  }
+
+  /* Results */
+  .result-box {
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    margin-top: 12px;
+    display: none;
+  }
+
+  .result-box.visible { display: block; }
+
+  .result-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+
+  .result-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--accent2);
+    word-break: break-all;
+  }
+
+  .result-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .result-actions .btn { flex: 1; }
+
+  /* Copy feedback */
+  .copy-toast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--accent2);
+    color: #0F1218;
+    padding: 10px 20px;
+    border-radius: 100px;
+    font-size: 14px;
+    font-weight: 600;
+    opacity: 0;
+    transition: all 0.3s ease;
+    z-index: 1000;
+    pointer-events: none;
+  }
+
+  .copy-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* GPS Status */
+  .gps-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    margin-bottom: 12px;
+    font-size: 13px;
+  }
+
+  .gps-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: background 0.3s;
+  }
+
+  .gps-dot.active {
+    background: var(--accent2);
+    box-shadow: 0 0 8px var(--accent2-glow);
+    animation: pulse 2s infinite;
+  }
+
+  .gps-dot.error { background: var(--danger); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* Saved list */
+  .saved-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .saved-item-info { flex: 1; }
+
+  .saved-item-name {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .saved-item-coords {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  .saved-item-time {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  .saved-item-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-left: 10px;
+  }
+
+  .icon-btn {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .icon-btn:active { background: var(--border); }
+  .icon-btn svg { width: 16px; height: 16px; }
+
+  .icon-btn.delete:active { background: rgba(248, 113, 113, 0.2); color: var(--danger); }
+
+  /* Map container */
+  #map {
+    width: 100%;
+    height: 300px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .map-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+
+  .map-card .card-title { margin-bottom: 10px; }
+
+  .map-coords-overlay {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    z-index: 1000;
+    background: rgba(15, 18, 24, 0.88);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent2);
+    pointer-events: none;
+  }
+
+  .map-type-toggle {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 1000;
+    display: flex;
+    gap: 4px;
+  }
+
+  .map-type-btn {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(15, 18, 24, 0.8);
+    backdrop-filter: blur(10px);
+    color: var(--text-dim);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .map-type-btn.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+
+  .leaflet-container { background: var(--bg) !important; }
+  .map-wrapper { position: relative; border-radius: var(--radius-sm); overflow: hidden; }
+
+  /* Swap button */
+  .swap-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 4px 0;
+    color: var(--text-muted);
+  }
+
+  .swap-arrow svg { width: 20px; height: 20px; }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+  }
+
+  .empty-state svg {
+    width: 48px; height: 48px;
+    margin-bottom: 12px;
+    opacity: 0.4;
+  }
+
+  .empty-state p { font-size: 14px; }
+
+  /* Zone selector */
+  .zone-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .zone-chip {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .zone-chip.active {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+    color: var(--accent);
+  }
+
+  /* Accuracy badge */
+  .accuracy-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+  }
+
+  .accuracy-good { background: rgba(52,211,153,0.15); color: var(--accent2); }
+  .accuracy-ok { background: rgba(251,191,36,0.15); color: var(--warning); }
+  .accuracy-bad { background: rgba(248,113,113,0.15); color: var(--danger); }
+
+  .section-gap { height: 8px; }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 14px 0;
+  }
+
+  /* Zone info pill */
+  .zone-info {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--surface2);
+    padding: 4px 10px;
+    border-radius: 100px;
+    margin-top: 6px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo-icon">📍</div>
+    <div>
+      <h1>CoordTool</h1>
+      <div class="header-sub">UTM ↔ WGS84 Converter</div>
+    </div>
+  </div>
+  <div class="epsg-badge">EPSG:32633</div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('convert')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+    Converti
+  </div>
+  <div class="tab" onclick="switchTab('gps')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>
+    GPS
+  </div>
+  <div class="tab" onclick="switchTab('saved')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+    Salvati
+  </div>
+</div>
+
+<div class="content">
+  <!-- CONVERT PANEL -->
+  <div class="panel active" id="panel-convert">
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+        Direzione conversione
+      </div>
+      <div class="zone-row">
+        <div class="zone-chip active" id="dir-utm2ll" onclick="setDirection('utm2ll')">UTM → Lat/Lon</div>
+        <div class="zone-chip" id="dir-ll2utm" onclick="setDirection('ll2utm')">Lat/Lon → UTM</div>
+      </div>
+    </div>
+
+    <!-- UTM to LatLon -->
+    <div id="form-utm2ll">
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
+          Coordinate UTM (input)
+        </div>
+        <div class="zone-row">
+          <div class="zone-chip active" id="zone-32" onclick="setZone(32)">Zona 32N</div>
+          <div class="zone-chip" id="zone-33" onclick="setZone(33)">Zona 33N</div>
+        </div>
+        <div class="input-row">
+          <div class="input-group">
+            <label>Easting (X)</label>
+            <input type="number" id="utm-e" placeholder="es. 270712" inputmode="numeric">
+          </div>
+          <div class="input-group">
+            <label>Northing (Y)</label>
+            <input type="number" id="utm-n" placeholder="es. 4763042" inputmode="numeric">
+          </div>
+        </div>
+        <div class="zone-info" id="zone-info-label">EPSG:32632 — WGS84 / UTM zona 32N</div>
+      </div>
+
+      <div class="swap-arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14m0 0l-4-4m4 4l4-4"/></svg>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="color: var(--accent2);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 10-16 0c0 3 2.7 7 8 11.7z"/></svg>
+          Risultato — Lat/Lon
+        </div>
+        <div id="result-utm2ll" class="result-box">
+          <div style="display:flex;gap:16px;margin-bottom:8px;">
+            <div style="flex:1"><div class="result-label">Latitudine</div><div class="result-value" id="res-lat">—</div></div>
+            <div style="flex:1"><div class="result-label">Longitudine</div><div class="result-value" id="res-lon">—</div></div>
+          </div>
+          <div class="result-actions">
+            <button class="btn btn-secondary btn-sm" onclick="copyResult('latlon')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copia
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="openInMaps('latlon')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              Mappa
+            </button>
+            <button class="btn btn-success btn-sm" onclick="savePoint('latlon')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+              Salva
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" onclick="convertUTMtoLL()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+        Converti
+      </button>
+
+      <div class="map-card" id="map-card-utm" style="display:none;margin-top:12px;">
+        <div class="card-title" style="color:var(--accent2);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/></svg>
+          Mappa
+        </div>
+        <div class="map-wrapper">
+          <div id="map-convert-utm" style="width:100%;height:280px;border-radius:8px;"></div>
+          <div class="map-coords-overlay" id="map-overlay-utm"></div>
+          <div class="map-type-toggle">
+            <div class="map-type-btn active" onclick="setMapLayer('convert-utm','street')">Mappa</div>
+            <div class="map-type-btn" onclick="setMapLayer('convert-utm','satellite')">Satellite</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LatLon to UTM -->
+    <div id="form-ll2utm" style="display:none;">
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 10-16 0c0 3 2.7 7 8 11.7z"/></svg>
+          Coordinate Lat/Lon (input)
+        </div>
+        <div class="input-row">
+          <div class="input-group">
+            <label>Latitudine</label>
+            <input type="number" id="ll-lat" placeholder="es. 42.9876" inputmode="decimal" step="any">
+          </div>
+          <div class="input-group">
+            <label>Longitudine</label>
+            <input type="number" id="ll-lon" placeholder="es. 12.3456" inputmode="decimal" step="any">
+          </div>
+        </div>
+      </div>
+
+      <div class="swap-arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14m0 0l-4-4m4 4l4-4"/></svg>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="color: var(--accent2);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
+          Risultato — UTM
+        </div>
+        <div class="zone-row">
+          <div class="zone-chip active" id="out-zone-32" onclick="setOutZone(32)">Zona 32N</div>
+          <div class="zone-chip" id="out-zone-33" onclick="setOutZone(33)">Zona 33N</div>
+        </div>
+        <div id="result-ll2utm" class="result-box">
+          <div style="display:flex;gap:16px;margin-bottom:8px;">
+            <div style="flex:1"><div class="result-label">Easting (X)</div><div class="result-value" id="res-e">—</div></div>
+            <div style="flex:1"><div class="result-label">Northing (Y)</div><div class="result-value" id="res-n">—</div></div>
+          </div>
+          <div class="zone-info" id="res-zone-label">EPSG:32632</div>
+          <div class="result-actions">
+            <button class="btn btn-secondary btn-sm" onclick="copyResult('utm')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copia
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="openInMaps('utm')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              Mappa
+            </button>
+            <button class="btn btn-success btn-sm" onclick="savePoint('utm')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+              Salva
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" onclick="convertLLtoUTM()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+        Converti
+      </button>
+
+      <div class="map-card" id="map-card-ll" style="display:none;margin-top:12px;">
+        <div class="card-title" style="color:var(--accent2);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/></svg>
+          Mappa
+        </div>
+        <div class="map-wrapper">
+          <div id="map-convert-ll" style="width:100%;height:280px;border-radius:8px;"></div>
+          <div class="map-coords-overlay" id="map-overlay-ll"></div>
+          <div class="map-type-toggle">
+            <div class="map-type-btn active" onclick="setMapLayer('convert-ll','street')">Mappa</div>
+            <div class="map-type-btn" onclick="setMapLayer('convert-ll','satellite')">Satellite</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GPS PANEL -->
+  <div class="panel" id="panel-gps">
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>
+        Posizione GPS attuale
+      </div>
+      <div class="gps-status">
+        <div class="gps-dot" id="gps-dot"></div>
+        <span id="gps-status-text" style="flex:1;color:var(--text-dim);">GPS non attivo</span>
+        <span class="accuracy-badge" id="gps-accuracy" style="display:none;"></span>
+      </div>
+      <button class="btn btn-primary" id="gps-btn" onclick="startGPS()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>
+        Rileva posizione
+      </button>
+    </div>
+
+    <div id="gps-results" style="display:none;">
+      <div class="card">
+        <div class="card-title" style="color:var(--accent2);">Lat/Lon (WGS84)</div>
+        <div style="display:flex;gap:16px;margin-bottom:10px;">
+          <div style="flex:1"><div class="result-label">Latitudine</div><div class="result-value" id="gps-lat">—</div></div>
+          <div style="flex:1"><div class="result-label">Longitudine</div><div class="result-value" id="gps-lon">—</div></div>
+        </div>
+        <div class="result-actions">
+          <button class="btn btn-secondary btn-sm" onclick="copyGPS('latlon')">Copia Lat/Lon</button>
+          <button class="btn btn-secondary btn-sm" onclick="openInMaps('gps')">Mappa</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="color:var(--accent);">UTM 33N (EPSG:32633)</div>
+        <div style="display:flex;gap:16px;margin-bottom:10px;">
+          <div style="flex:1"><div class="result-label">Easting (X)</div><div class="result-value" id="gps-utm-e">—</div></div>
+          <div style="flex:1"><div class="result-label">Northing (Y)</div><div class="result-value" id="gps-utm-n">—</div></div>
+        </div>
+        <div class="result-actions">
+          <button class="btn btn-secondary btn-sm" onclick="copyGPS('utm33')">Copia UTM 33N</button>
+          <button class="btn btn-success btn-sm" onclick="saveGPSPoint()">Salva punto</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="color:var(--accent);">UTM 32N (EPSG:32632)</div>
+        <div style="display:flex;gap:16px;">
+          <div style="flex:1"><div class="result-label">Easting (X)</div><div class="result-value" id="gps-utm32-e">—</div></div>
+          <div style="flex:1"><div class="result-label">Northing (Y)</div><div class="result-value" id="gps-utm32-n">—</div></div>
+        </div>
+        <div class="result-actions" style="margin-top:10px;">
+          <button class="btn btn-secondary btn-sm" onclick="copyGPS('utm32')">Copia UTM 32N</button>
+        </div>
+      </div>
+
+      <div class="map-card" id="map-card-gps">
+        <div class="card-title" style="color:var(--accent2);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/></svg>
+          Posizione sulla mappa
+        </div>
+        <div class="map-wrapper">
+          <div id="map-gps" style="width:100%;height:300px;border-radius:8px;"></div>
+          <div class="map-coords-overlay" id="map-overlay-gps"></div>
+          <div class="map-type-toggle">
+            <div class="map-type-btn active" onclick="setMapLayer('gps','street')">Mappa</div>
+            <div class="map-type-btn" onclick="setMapLayer('gps','satellite')">Satellite</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SAVED PANEL -->
+  <div class="panel" id="panel-saved">
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+        Punti salvati
+      </div>
+      <div id="saved-list">
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+          <p>Nessun punto salvato.<br>Converti o usa il GPS per salvare punti.</p>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-secondary" onclick="exportSaved()" id="export-btn" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      Esporta CSV
+    </button>
+  </div>
+</div>
+
+<div class="copy-toast" id="toast">Copiato!</div>
+
+<script>
+// ============================================
+// UTM ↔ WGS84 conversion (pure JS, no libs)
+// Based on Karney's formulas, accurate to ~1mm
+// ============================================
+
+const UTM = (() => {
+  const a = 6378137;
+  const f = 1 / 298.257223563;
+  const n = f / (2 - f);
+  const A = a / (1 + n) * (1 + n*n/4 + n*n*n*n/64);
+
+  const alpha = [
+    0,
+    n/2 - 2*n*n/3 + 5*n*n*n/16,
+    13*n*n/48 - 3*n*n*n/5,
+    61*n*n*n/240
+  ];
+
+  const beta = [
+    0,
+    n/2 - 2*n*n/3 + 37*n*n*n/96,
+    n*n/48 + n*n*n/15,
+    17*n*n*n/480
+  ];
+
+  const delta = [
+    0,
+    2*n - 2*n*n/3 - 2*n*n*n,
+    7*n*n/3 - 8*n*n*n/5,
+    56*n*n*n/15
+  ];
+
+  const k0 = 0.9996;
+
+  function toLatLon(E, N, zone) {
+    const x = E - 500000;
+    const y = N;
+    const lon0 = ((zone - 1) * 6 - 180 + 3) * Math.PI / 180;
+
+    const xi = y / (k0 * A);
+    const eta = x / (k0 * A);
+
+    let xi2 = xi;
+    let eta2 = eta;
+    let pSig = 1, qSig = 0;
+
+    for (let j = 1; j <= 3; j++) {
+      const sxi = Math.sin(2 * j * xi);
+      const cxi = Math.cos(2 * j * xi);
+      const sheta = Math.sinh(2 * j * eta);
+      const cheta = Math.cosh(2 * j * eta);
+      xi2 -= beta[j] * sxi * cheta;
+      eta2 -= beta[j] * cxi * sheta;
+      pSig -= 2 * j * beta[j] * cxi * cheta;
+      qSig += 2 * j * beta[j] * sxi * sheta;
+    }
+
+    const sheta2 = Math.sinh(eta2);
+    const sinxi2 = Math.sin(xi2);
+    const cosxi2 = Math.cos(xi2);
+
+    const chi = Math.asin(sinxi2 / Math.cosh(eta2));
+    let lat = chi;
+    for (let j = 1; j <= 3; j++) {
+      lat += delta[j] * Math.sin(2 * j * chi);
+    }
+
+    const lon = lon0 + Math.atan2(sheta2, cosxi2);
+
+    return {
+      lat: lat * 180 / Math.PI,
+      lon: lon * 180 / Math.PI
+    };
+  }
+
+  function fromLatLon(lat, lon, zone) {
+    const latR = lat * Math.PI / 180;
+    const lonR = lon * Math.PI / 180;
+    const lon0 = ((zone - 1) * 6 - 180 + 3) * Math.PI / 180;
+
+    const tau = Math.tan(latR);
+    const e = Math.sqrt(2*f - f*f);
+    const sinLat = Math.sin(latR);
+
+    const sigma = Math.sinh(e * Math.atanh(e * sinLat));
+    const tauP = tau * Math.sqrt(1 + sigma*sigma) - sigma * Math.sqrt(1 + tau*tau);
+
+    const xi0 = Math.atan2(tauP, Math.cos(lonR - lon0));
+    const eta0 = Math.asinh(Math.sin(lonR - lon0) / Math.sqrt(tauP*tauP + Math.cos(lonR - lon0)*Math.cos(lonR - lon0)));
+
+    let xi = xi0, eta = eta0;
+    for (let j = 1; j <= 3; j++) {
+      xi += alpha[j] * Math.sin(2*j*xi0) * Math.cosh(2*j*eta0);
+      eta += alpha[j] * Math.cos(2*j*xi0) * Math.sinh(2*j*eta0);
+    }
+
+    const E = eta * k0 * A + 500000;
+    const N = xi * k0 * A;
+
+    return { easting: Math.round(E), northing: Math.round(N) };
+  }
+
+  function getZone(lon) {
+    return Math.floor((lon + 180) / 6) + 1;
+  }
+
+  return { toLatLon, fromLatLon, getZone };
+})();
+
+// ============================================
+// App state
+// ============================================
+let currentZone = 32;
+let outputZone = 32;
+let lastGPSLat = null, lastGPSLon = null;
+let savedPoints = JSON.parse(localStorage?.getItem?.('coord_points') || '[]') || [];
+let watchId = null;
+
+// ============================================
+// Tab switching
+// ============================================
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', t.getAttribute('onclick').includes(tab));
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+
+  if (tab === 'saved') renderSaved();
+}
+
+// ============================================
+// Direction toggle
+// ============================================
+function setDirection(dir) {
+  document.getElementById('dir-utm2ll').classList.toggle('active', dir === 'utm2ll');
+  document.getElementById('dir-ll2utm').classList.toggle('active', dir === 'll2utm');
+  document.getElementById('form-utm2ll').style.display = dir === 'utm2ll' ? '' : 'none';
+  document.getElementById('form-ll2utm').style.display = dir === 'll2utm' ? '' : 'none';
+}
+
+// ============================================
+// Zone selection
+// ============================================
+function setZone(z) {
+  currentZone = z;
+  document.getElementById('zone-32').classList.toggle('active', z === 32);
+  document.getElementById('zone-33').classList.toggle('active', z === 33);
+  document.getElementById('zone-info-label').textContent = `EPSG:326${z} — WGS84 / UTM zona ${z}N`;
+  // Update header badge
+  document.querySelector('.epsg-badge').textContent = `EPSG:326${z}`;
+}
+
+function setOutZone(z) {
+  outputZone = z;
+  document.getElementById('out-zone-32').classList.toggle('active', z === 32);
+  document.getElementById('out-zone-33').classList.toggle('active', z === 33);
+  // Re-convert if we have values
+  const lat = parseFloat(document.getElementById('ll-lat').value);
+  const lon = parseFloat(document.getElementById('ll-lon').value);
+  if (!isNaN(lat) && !isNaN(lon)) convertLLtoUTM();
+}
+
+// ============================================
+// Conversions
+// ============================================
+function convertUTMtoLL() {
+  const e = parseFloat(document.getElementById('utm-e').value);
+  const n = parseFloat(document.getElementById('utm-n').value);
+  if (isNaN(e) || isNaN(n)) return showToast('Inserisci coordinate valide');
+
+  const result = UTM.toLatLon(e, n, currentZone);
+  document.getElementById('res-lat').textContent = result.lat.toFixed(7);
+  document.getElementById('res-lon').textContent = result.lon.toFixed(7);
+  document.getElementById('result-utm2ll').classList.add('visible');
+  document.getElementById('result-utm2ll').style.display = 'block';
+  lastGPSLat = result.lat;
+  lastGPSLon = result.lon;
+
+  showMapForPoint('convert-utm', result.lat, result.lon, 'map-card-utm');
+}
+
+function convertLLtoUTM() {
+  const lat = parseFloat(document.getElementById('ll-lat').value);
+  const lon = parseFloat(document.getElementById('ll-lon').value);
+  if (isNaN(lat) || isNaN(lon)) return showToast('Inserisci coordinate valide');
+
+  const result = UTM.fromLatLon(lat, lon, outputZone);
+  document.getElementById('res-e').textContent = result.easting;
+  document.getElementById('res-n').textContent = result.northing;
+  document.getElementById('res-zone-label').textContent = `EPSG:326${outputZone}`;
+  document.getElementById('result-ll2utm').classList.add('visible');
+  document.getElementById('result-ll2utm').style.display = 'block';
+  lastGPSLat = lat;
+  lastGPSLon = lon;
+
+  showMapForPoint('convert-ll', lat, lon, 'map-card-ll');
+}
+
+// ============================================
+// GPS
+// ============================================
+function startGPS() {
+  if (!navigator.geolocation) {
+    showToast('GPS non supportato');
+    return;
+  }
+
+  const dot = document.getElementById('gps-dot');
+  const status = document.getElementById('gps-status-text');
+  const btn = document.getElementById('gps-btn');
+
+  dot.className = 'gps-dot';
+  status.textContent = 'Acquisizione...';
+  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg> In corso...`;
+
+  if (watchId) navigator.geolocation.clearWatch(watchId);
+
+  watchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      const acc = pos.coords.accuracy;
+
+      lastGPSLat = lat;
+      lastGPSLon = lon;
+
+      dot.className = 'gps-dot active';
+      status.textContent = `Posizione acquisita`;
+
+      const accBadge = document.getElementById('gps-accuracy');
+      accBadge.style.display = '';
+      accBadge.textContent = `±${Math.round(acc)}m`;
+      accBadge.className = 'accuracy-badge ' + (acc < 10 ? 'accuracy-good' : acc < 30 ? 'accuracy-ok' : 'accuracy-bad');
+
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg> Aggiorna`;
+
+      // Lat/Lon
+      document.getElementById('gps-lat').textContent = lat.toFixed(7);
+      document.getElementById('gps-lon').textContent = lon.toFixed(7);
+
+      // UTM 33N
+      const utm33 = UTM.fromLatLon(lat, lon, 33);
+      document.getElementById('gps-utm-e').textContent = utm33.easting;
+      document.getElementById('gps-utm-n').textContent = utm33.northing;
+
+      // UTM 32N
+      const utm32 = UTM.fromLatLon(lat, lon, 32);
+      document.getElementById('gps-utm32-e').textContent = utm32.easting;
+      document.getElementById('gps-utm32-n').textContent = utm32.northing;
+
+      document.getElementById('gps-results').style.display = '';
+
+      // Update GPS map
+      showMapForPoint('gps', lat, lon, 'map-card-gps');
+    },
+    (err) => {
+      dot.className = 'gps-dot error';
+      status.textContent = err.code === 1 ? 'Permesso negato' : 'Errore GPS';
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg> Riprova`;
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+}
+
+// ============================================
+// Copy
+// ============================================
+function copyResult(type) {
+  let text;
+  if (type === 'latlon') {
+    text = `${document.getElementById('res-lat').textContent}, ${document.getElementById('res-lon').textContent}`;
+  } else {
+    text = `X: ${document.getElementById('res-e').textContent}, Y: ${document.getElementById('res-n').textContent}`;
+  }
+  navigator.clipboard?.writeText(text).then(() => showToast('Copiato!'));
+}
+
+function copyGPS(type) {
+  let text;
+  if (type === 'latlon') {
+    text = `${document.getElementById('gps-lat').textContent}, ${document.getElementById('gps-lon').textContent}`;
+  } else if (type === 'utm33') {
+    text = `X: ${document.getElementById('gps-utm-e').textContent}, Y: ${document.getElementById('gps-utm-n').textContent}`;
+  } else {
+    text = `X: ${document.getElementById('gps-utm32-e').textContent}, Y: ${document.getElementById('gps-utm32-n').textContent}`;
+  }
+  navigator.clipboard?.writeText(text).then(() => showToast('Copiato!'));
+}
+
+function openInMaps() {
+  if (lastGPSLat && lastGPSLon) {
+    window.open(`https://www.google.com/maps?q=${lastGPSLat},${lastGPSLon}`, '_blank');
+  }
+}
+
+// ============================================
+// Save points
+// ============================================
+function savePoint(type) {
+  const name = prompt('Nome del punto (opzionale):') || `Punto ${savedPoints.length + 1}`;
+  const point = {
+    name,
+    lat: lastGPSLat,
+    lon: lastGPSLon,
+    time: new Date().toISOString()
+  };
+
+  if (type === 'latlon') {
+    point.lat = parseFloat(document.getElementById('res-lat').textContent);
+    point.lon = parseFloat(document.getElementById('res-lon').textContent);
+  } else if (type === 'utm') {
+    point.lat = lastGPSLat;
+    point.lon = lastGPSLon;
+  }
+
+  savedPoints.push(point);
+  try { localStorage.setItem('coord_points', JSON.stringify(savedPoints)); } catch(e) {}
+  showToast(`"${name}" salvato!`);
+}
+
+function saveGPSPoint() {
+  const name = prompt('Nome del punto:') || `GPS ${savedPoints.length + 1}`;
+  savedPoints.push({
+    name,
+    lat: lastGPSLat,
+    lon: lastGPSLon,
+    time: new Date().toISOString()
+  });
+  try { localStorage.setItem('coord_points', JSON.stringify(savedPoints)); } catch(e) {}
+  showToast(`"${name}" salvato!`);
+}
+
+function renderSaved() {
+  const list = document.getElementById('saved-list');
+  const exportBtn = document.getElementById('export-btn');
+
+  if (savedPoints.length === 0) {
+    list.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+      <p>Nessun punto salvato.<br>Converti o usa il GPS per salvare punti.</p>
+    </div>`;
+    exportBtn.style.display = 'none';
+    return;
+  }
+
+  exportBtn.style.display = '';
+  list.innerHTML = savedPoints.map((p, i) => {
+    const utm33 = UTM.fromLatLon(p.lat, p.lon, 33);
+    const d = new Date(p.time);
+    const timeStr = d.toLocaleDateString('it') + ' ' + d.toLocaleTimeString('it', {hour:'2-digit',minute:'2-digit'});
+    return `<div class="saved-item">
+      <div class="saved-item-info">
+        <div class="saved-item-name">${p.name}</div>
+        <div class="saved-item-coords">
+          Lat: ${p.lat?.toFixed(6)}, Lon: ${p.lon?.toFixed(6)}<br>
+          UTM 33N — X: ${utm33.easting}, Y: ${utm33.northing}
+        </div>
+        <div class="saved-item-time">${timeStr}</div>
+      </div>
+      <div class="saved-item-actions">
+        <div class="icon-btn" onclick="copySaved(${i})" title="Copia">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        </div>
+        <div class="icon-btn" onclick="openSavedMap(${i})" title="Mappa">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        </div>
+        <div class="icon-btn delete" onclick="deleteSaved(${i})" title="Elimina">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function copySaved(i) {
+  const p = savedPoints[i];
+  const utm33 = UTM.fromLatLon(p.lat, p.lon, 33);
+  const text = `${p.name}\nLat: ${p.lat.toFixed(7)}, Lon: ${p.lon.toFixed(7)}\nUTM 33N — X: ${utm33.easting}, Y: ${utm33.northing}`;
+  navigator.clipboard?.writeText(text).then(() => showToast('Copiato!'));
+}
+
+function openSavedMap(i) {
+  const p = savedPoints[i];
+  window.open(`https://www.google.com/maps?q=${p.lat},${p.lon}`, '_blank');
+}
+
+function deleteSaved(i) {
+  if (confirm(`Eliminare "${savedPoints[i].name}"?`)) {
+    savedPoints.splice(i, 1);
+    try { localStorage.setItem('coord_points', JSON.stringify(savedPoints)); } catch(e) {}
+    renderSaved();
+  }
+}
+
+function exportSaved() {
+  let csv = 'Nome,Latitudine,Longitudine,UTM33N_Easting,UTM33N_Northing,Data\n';
+  savedPoints.forEach(p => {
+    const utm = UTM.fromLatLon(p.lat, p.lon, 33);
+    csv += `"${p.name}",${p.lat},${p.lon},${utm.easting},${utm.northing},${p.time}\n`;
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `coordinate_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSV esportato!');
+}
+
+// ============================================
+// Maps (Leaflet + OpenStreetMap)
+// ============================================
+const maps = {};
+const markers = {};
+const layers = {};
+
+const tileLayers = {
+  street: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+};
+
+const tileAttrib = {
+  street: '&copy; OpenStreetMap',
+  satellite: '&copy; Esri'
+};
+
+function getOrCreateMap(id, lat, lon, zoom) {
+  if (maps[id]) {
+    maps[id].setView([lat, lon], zoom || maps[id].getZoom());
+    if (markers[id]) {
+      markers[id].setLatLng([lat, lon]);
+    } else {
+      markers[id] = L.marker([lat, lon]).addTo(maps[id]);
+    }
+    updateMapOverlay(id, lat, lon);
+    return maps[id];
+  }
+
+  // Need a small delay for the container to be visible
+  setTimeout(() => {
+    const map = L.map('map-' + id, {
+      zoomControl: false,
+      attributionControl: false
+    }).setView([lat, lon], zoom || 15);
+
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    layers[id] = {
+      street: L.tileLayer(tileLayers.street, { attribution: tileAttrib.street, maxZoom: 19 }),
+      satellite: L.tileLayer(tileLayers.satellite, { attribution: tileAttrib.satellite, maxZoom: 18 })
+    };
+
+    layers[id].street.addTo(map);
+
+    // Custom marker icon
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="
+        width:28px;height:28px;
+        background:var(--accent);
+        border:3px solid white;
+        border-radius:50%;
+        box-shadow:0 2px 8px rgba(0,0,0,0.4);
+        position:relative;
+      "><div style="
+        position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);
+        width:0;height:0;
+        border-left:6px solid transparent;
+        border-right:6px solid transparent;
+        border-top:8px solid var(--accent);
+      "></div></div>`,
+      iconSize: [28, 36],
+      iconAnchor: [14, 36]
+    });
+
+    markers[id] = L.marker([lat, lon], { icon }).addTo(map);
+    maps[id] = map;
+    updateMapOverlay(id, lat, lon);
+
+    // Tap on map to get coordinates
+    map.on('click', function(e) {
+      const clickLat = e.latlng.lat;
+      const clickLon = e.latlng.lng;
+      markers[id].setLatLng([clickLat, clickLon]);
+      updateMapOverlay(id, clickLat, clickLon);
+
+      // If convert panel, fill in the lat/lon fields
+      if (id === 'convert-utm') {
+        lastGPSLat = clickLat;
+        lastGPSLon = clickLon;
+        const utm = UTM.fromLatLon(clickLat, clickLon, currentZone);
+        document.getElementById('utm-e').value = utm.easting;
+        document.getElementById('utm-n').value = utm.northing;
+        document.getElementById('res-lat').textContent = clickLat.toFixed(7);
+        document.getElementById('res-lon').textContent = clickLon.toFixed(7);
+        document.getElementById('result-utm2ll').style.display = 'block';
+      } else if (id === 'convert-ll') {
+        lastGPSLat = clickLat;
+        lastGPSLon = clickLon;
+        document.getElementById('ll-lat').value = clickLat.toFixed(7);
+        document.getElementById('ll-lon').value = clickLon.toFixed(7);
+        const utm = UTM.fromLatLon(clickLat, clickLon, outputZone);
+        document.getElementById('res-e').textContent = utm.easting;
+        document.getElementById('res-n').textContent = utm.northing;
+        document.getElementById('result-ll2utm').style.display = 'block';
+      }
+    });
+  }, 50);
+}
+
+function updateMapOverlay(id, lat, lon) {
+  const el = document.getElementById('map-overlay-' + id);
+  if (el) {
+    const utm33 = UTM.fromLatLon(lat, lon, 33);
+    el.innerHTML = `${lat.toFixed(6)}, ${lon.toFixed(6)}<br>UTM 33N: ${utm33.easting}, ${utm33.northing}`;
+  }
+}
+
+function setMapLayer(mapId, type) {
+  if (!maps[mapId] || !layers[mapId]) return;
+  const map = maps[mapId];
+
+  Object.values(layers[mapId]).forEach(l => map.removeLayer(l));
+  layers[mapId][type].addTo(map);
+
+  // Update toggle buttons
+  const wrapper = document.getElementById('map-' + mapId).closest('.map-wrapper');
+  if (wrapper) {
+    wrapper.querySelectorAll('.map-type-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.textContent.toLowerCase() === (type === 'street' ? 'mappa' : 'satellite'));
+    });
+  }
+}
+
+function showMapForPoint(mapId, lat, lon, cardId) {
+  const card = document.getElementById(cardId);
+  if (card) card.style.display = '';
+  getOrCreateMap(mapId, lat, lon, 15);
+}
+
+// ============================================
+// Toast
+// ============================================
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// Math polyfill
+Math.asinh = Math.asinh || function(x) { return Math.log(x + Math.sqrt(x*x + 1)); };
+Math.atanh = Math.atanh || function(x) { return Math.log((1+x)/(1-x)) / 2; };
+
+// Init
+setZone(33);
+</script>
+</body>
+</html>
