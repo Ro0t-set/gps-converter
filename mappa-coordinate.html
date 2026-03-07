@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mappa Coordinate — Umbria</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Sans',sans-serif; background:#0F1218; color:#E8ECF4; }
+
+  #map { width:100%; height:100vh; }
+
+  .info-panel {
+    position:fixed; top:12px; left:12px; z-index:1000;
+    background:rgba(15,18,24,0.92); backdrop-filter:blur(16px);
+    border:1px solid #2A3144; border-radius:14px;
+    padding:14px 18px; max-width:320px;
+  }
+  .info-panel h2 { font-size:16px; font-weight:700; margin-bottom:4px; }
+  .info-panel .sub { font-size:12px; color:#8B95A8; margin-bottom:10px; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; }
+  .legend-item { display:flex; align-items:center; gap:6px; font-size:12px; color:#8B95A8; }
+  .legend-dot { width:12px; height:12px; border-radius:50%; border:2px solid white; }
+
+  .controls {
+    position:fixed; top:12px; right:12px; z-index:1000;
+    display:flex; flex-direction:column; gap:6px;
+  }
+  .ctrl-btn {
+    padding:8px 14px; border-radius:8px;
+    border:1px solid #2A3144; background:rgba(15,18,24,0.92);
+    backdrop-filter:blur(16px); color:#8B95A8; font-size:12px;
+    font-weight:600; cursor:pointer; font-family:'DM Sans',sans-serif;
+    transition:all 0.15s;
+  }
+  .ctrl-btn:hover, .ctrl-btn.active { background:#4A7CFF; color:white; border-color:#4A7CFF; }
+
+  .leaflet-popup-content-wrapper {
+    background:#181D27 !important; color:#E8ECF4 !important;
+    border:1px solid #2A3144 !important; border-radius:10px !important;
+    box-shadow:0 8px 32px rgba(0,0,0,0.5) !important;
+  }
+  .leaflet-popup-tip { background:#181D27 !important; border-top:1px solid #2A3144 !important; }
+  .leaflet-popup-content { margin:12px 16px !important; font-family:'DM Sans',sans-serif !important; }
+
+  .popup-name { font-weight:700; font-size:14px; margin-bottom:4px; }
+  .popup-prot { font-size:11px; color:#8B95A8; margin-bottom:8px; }
+  .popup-coords { font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.8; }
+  .popup-coords span { color:#34D399; }
+  .popup-badge {
+    display:inline-block; padding:2px 8px; border-radius:4px;
+    font-size:10px; font-weight:600; margin-top:6px;
+  }
+  .badge-utm { background:rgba(52,211,153,0.15); color:#34D399; }
+  .badge-conv { background:rgba(74,124,255,0.15); color:#4A7CFF; }
+
+  .stats-bar {
+    position:fixed; bottom:12px; left:50%; transform:translateX(-50%); z-index:1000;
+    background:rgba(15,18,24,0.92); backdrop-filter:blur(16px);
+    border:1px solid #2A3144; border-radius:100px;
+    padding:8px 20px; font-size:13px; color:#8B95A8;
+    display:flex; gap:16px; align-items:center;
+  }
+  .stats-bar strong { color:#E8ECF4; }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="info-panel">
+  <h2>Coordinate Umbria</h2>
+  <div class="sub">67 punti unici — dati convertiti da gradi decimali + UTM 33N</div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#34D399;"></div> Già UTM 33N</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#4A7CFF;"></div> Convertiti</div>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="ctrl-btn active" onclick="setLayer('street')">Mappa</div>
+  <div class="ctrl-btn" onclick="setLayer('satellite')">Satellite</div>
+  <div class="ctrl-btn" onclick="setLayer('topo')">Topo</div>
+  <div class="ctrl-btn" onclick="fitAll()">Vedi tutti</div>
+</div>
+
+<div class="stats-bar">
+  <span><strong>6</strong> già UTM33</span>
+  <span><strong>61</strong> convertiti</span>
+  <span><strong>2</strong> persi</span>
+</div>
+
+<script>
+const points = [{"lat":43.45907,"lon":12.34958,"name":"Farioli Ketty","prot":"07/2025","tipo":"utm33"},{"lat":43.45672,"lon":12.35063,"name":"Farioli Ketty","prot":"07/2025","tipo":"utm33"},{"lat":43.46206,"lon":12.35801,"name":"Farioli Ketty","prot":"07/2025","tipo":"utm33"},{"lat":43.20263,"lon":12.67102,"name":"BIANCONI DOMENICO","prot":"09/2025","tipo":"utm33"},{"lat":43.45558,"lon":12.29166,"name":"SILWOOD DI SILVESTRINI ROBERTO","prot":"17/2025","tipo":"utm33"},{"lat":43.23175,"lon":12.3815,"name":"BIAGIOTTI ALEANDRO","prot":"24/2025","tipo":"converted"},{"lat":43.28258,"lon":12.2855,"name":"MARTINELLI GIUSEPPE","prot":"36/2025","tipo":"converted"},{"lat":43.17742,"lon":12.3931,"name":"Soc. Agr. F.lli Bertoldo","prot":"43/2025","tipo":"converted"},{"lat":43.25621,"lon":12.2231,"name":"Farioli Katia","prot":"45/2025","tipo":"converted"},{"lat":43.25212,"lon":12.223,"name":"Farioli Katia","prot":"45/2025","tipo":"converted"},{"lat":43.20476,"lon":12.1016,"name":"PATRIARCHI RAFFAELE","prot":"51/2025","tipo":"converted"},{"lat":43.20285,"lon":12.0847,"name":"PATRIARCHI RAFFAELE","prot":"51/2025","tipo":"converted"},{"lat":42.5927,"lon":12.3326,"name":"BERTOLDO LORIS","prot":"52/2025","tipo":"converted"},{"lat":42.57348,"lon":12.2956,"name":"BERTOLDO LORIS","prot":"52/2025","tipo":"converted"},{"lat":43.15489,"lon":12.445,"name":"Sereni Michele","prot":"61/2025","tipo":"converted"},{"lat":43.15798,"lon":12.4402,"name":"Sereni Michele","prot":"61/2025","tipo":"converted"},{"lat":43.15603,"lon":12.4436,"name":"Sereni Michele","prot":"61/2025","tipo":"converted"},{"lat":43.41565,"lon":12.4449,"name":"Burzacchi Mauro","prot":"65/2025","tipo":"converted"},{"lat":43.41577,"lon":12.4386,"name":"Burzacchi Mauro","prot":"65/2025","tipo":"converted"},{"lat":43.45115,"lon":12.2913,"name":"SILWOOD DI SILVESTRINI ROBERTO","prot":"75/2025","tipo":"converted"},{"lat":43.14716,"lon":11.9706,"name":"SOC. LA QUERCIA DEL PENTIMENTO","prot":"91/2025","tipo":"converted"},{"lat":43.13561,"lon":12.1146,"name":"ALUNNI CORRADO","prot":"96/2025","tipo":"converted"},{"lat":43.13103,"lon":12.1016,"name":"ALUNNI CORRADO","prot":"96/2025","tipo":"converted"},{"lat":43.13434,"lon":12.1135,"name":"ALUNNI CORRADO","prot":"96/2025","tipo":"converted"},{"lat":43.13478,"lon":12.1134,"name":"ALUNNI CORRADO","prot":"96/2025","tipo":"converted"},{"lat":43.42604,"lon":12.4553,"name":"TOGNOLONI MARIO","prot":"98/2025","tipo":"converted"},{"lat":42.96118,"lon":12.0588,"name":"Soc. Agr. F.lli Bertoldo","prot":"101/2025","tipo":"converted"},{"lat":42.94297,"lon":12.017,"name":"Lav. Agr. In. Snc Di Bertoldo Alceo","prot":"102/2025","tipo":"converted"},{"lat":43.42458,"lon":12.4547,"name":"PANDOLFI NAZZARENO","prot":"109/2025","tipo":"converted"},{"lat":43.45633,"lon":12.3499,"name":"Farioli Ketty","prot":"120/2025","tipo":"converted"},{"lat":43.20485,"lon":12.673,"name":"BIANCONI DOMENICO","prot":"126/2025","tipo":"converted"},{"lat":42.94299,"lon":12.0184,"name":"Lav. Agr. In. Snc Di Bertoldo Alceo","prot":"128/2025","tipo":"converted"},{"lat":43.20088,"lon":12.6702,"name":"BIANCONI DOMENICO","prot":"131/2025","tipo":"converted"},{"lat":43.31201,"lon":12.2408,"name":"CURTI EMANUELE","prot":"159/2025","tipo":"converted"},{"lat":43.17106,"lon":12.1025,"name":"CURTI EMANUELE","prot":"159/2025","tipo":"converted"},{"lat":43.18579,"lon":12.1408,"name":"CURTI EMANUELE","prot":"159/2025","tipo":"converted"},{"lat":43.28878,"lon":12.1727,"name":"CURTI GABRIELE","prot":"160/2025","tipo":"converted"},{"lat":43.17467,"lon":11.981,"name":"GIORGETTI IACOPO","prot":"169/2025","tipo":"converted"},{"lat":43.00579,"lon":12.2703,"name":"MORETTI MARCELLO","prot":"172/2025","tipo":"converted"},{"lat":43.0323,"lon":12.2499,"name":"CIPRIANI MARCELLO","prot":"175/2025","tipo":"converted"},{"lat":43.30998,"lon":12.2513,"name":"GAGLIARDI RINA","prot":"183/2025","tipo":"converted"},{"lat":43.30233,"lon":12.6025,"name":"NUOVA SANT'ERASMO","prot":"187/2025","tipo":"converted"},{"lat":43.02705,"lon":12.161,"name":"CAGIOTTI ROBERTO","prot":"188/2025","tipo":"converted"},{"lat":43.34997,"lon":12.2718,"name":"SOC. AGR. GILDONI ANDREA","prot":"189/2025","tipo":"converted"},{"lat":43.33845,"lon":12.3044,"name":"SOC. AGR. GILDONI ANDREA","prot":"189/2025","tipo":"converted"},{"lat":43.09054,"lon":12.0739,"name":"MEONI MICHELE","prot":"213/2025","tipo":"converted"},{"lat":43.34905,"lon":12.3214,"name":"FATTORIA TERRA E SAPORI","prot":"218/2025","tipo":"converted"},{"lat":42.96042,"lon":12.2877,"name":"TERRE UMBRE S.S. AGRICOLA","prot":"222/2025","tipo":"converted"},{"lat":43.00563,"lon":12.2667,"name":"GIOVAGNOLI DANIELE","prot":"225/2025","tipo":"converted"},{"lat":42.96988,"lon":12.2629,"name":"BARCHIESI ATTILIO","prot":"226/2025","tipo":"converted"},{"lat":43.3533,"lon":12.278,"name":"SOC. AGR. GILDONI ANDREA","prot":"238/2025","tipo":"converted"},{"lat":43.36402,"lon":12.2849,"name":"SOC. AGR. GILDONI ANDREA","prot":"238/2025","tipo":"converted"},{"lat":43.36705,"lon":12.2837,"name":"SOC. AGR. GILDONI ANDREA","prot":"238/2025","tipo":"converted"},{"lat":43.11074,"lon":12.0219,"name":"PAPALINI FABIO","prot":"248/2025","tipo":"converted"},{"lat":42.96035,"lon":12.0745,"name":"Lav. Agr. In. Snc Di Bertoldo Alceo","prot":"252/2025","tipo":"converted"},{"lat":42.91365,"lon":12.0203,"name":"Grassi Maria Teresa","prot":"253/2025","tipo":"converted"},{"lat":42.98295,"lon":12.1893,"name":"La Casa Dei Cini","prot":"254/2025","tipo":"converted"},{"lat":42.98149,"lon":12.2055,"name":"La Casa Dei Cini","prot":"254/2025","tipo":"converted"},{"lat":43.36618,"lon":12.3405,"name":"Az. Agr. 3 Orti","prot":"270/2025","tipo":"converted"},{"lat":43.00946,"lon":11.9689,"name":"INAGRA SOC. SEMPLICE AGRICOLA","prot":"272/2025","tipo":"converted"},{"lat":43.30143,"lon":12.6031,"name":"NUOVA SANT'ERASMO","prot":"291/2025","tipo":"converted"},{"lat":43.16162,"lon":12.5919,"name":"ROCCETTI SOC. AGR.","prot":"304/2025","tipo":"converted"},{"lat":43.00578,"lon":12.2702,"name":"MORETTI MARCELLO","prot":"307/2025","tipo":"converted"},{"lat":43.42778,"lon":12.107,"name":"RAPERINI CARLO","prot":"314/2025","tipo":"converted"},{"lat":43.15853,"lon":12.5891,"name":"ROCCETTI SOC. AGR.","prot":"316/2025","tipo":"converted"},{"lat":43.28937,"lon":12.2507,"name":"CURTI GABRIELE","prot":"322/2025","tipo":"converted"},{"lat":43.21353,"lon":12.202,"name":"Az. Agr. 3 Orti","prot":"326/2025","tipo":"converted"}];
+
+// UTM conversion for popup
+function toUTM33(lat, lon) {
+  const a=6378137,f=1/298.257223563,n=f/(2-f),A_=a/(1+n)*(1+n*n/4+n*n*n*n/64);
+  const alpha=[0,n/2-2*n*n/3+5*n*n*n/16,13*n*n/48-3*n*n*n/5,61*n*n*n/240];
+  const k0=0.9996,zone=33,lon0=((zone-1)*6-180+3)*Math.PI/180;
+  const latR=lat*Math.PI/180,lonR=lon*Math.PI/180;
+  const tau=Math.tan(latR),e=Math.sqrt(2*f-f*f),sinLat=Math.sin(latR);
+  const sigma=Math.sinh(e*Math.atanh(e*sinLat));
+  const tauP=tau*Math.sqrt(1+sigma*sigma)-sigma*Math.sqrt(1+tau*tau);
+  const xi0=Math.atan2(tauP,Math.cos(lonR-lon0));
+  const eta0=Math.asinh(Math.sin(lonR-lon0)/Math.sqrt(tauP*tauP+Math.cos(lonR-lon0)**2));
+  let xi=xi0,eta=eta0;
+  for(let j=1;j<=3;j++){xi+=alpha[j]*Math.sin(2*j*xi0)*Math.cosh(2*j*eta0);eta+=alpha[j]*Math.cos(2*j*xi0)*Math.sinh(2*j*eta0);}
+  return{e:Math.round(eta*k0*A_+500000),n:Math.round(xi*k0*A_)};
+}
+
+// Map
+const map = L.map('map',{zoomControl:false}).setView([43.15,12.35],10);
+L.control.zoom({position:'bottomright'}).addTo(map);
+
+const layers = {
+  street: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}),
+  satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:18}),
+  topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17})
+};
+let activeLayer = layers.street.addTo(map);
+
+function setLayer(type) {
+  map.removeLayer(activeLayer);
+  activeLayer = layers[type].addTo(map);
+  document.querySelectorAll('.ctrl-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+// Markers
+const markers = [];
+const group = L.featureGroup();
+
+points.forEach(p => {
+  const isUtm = p.tipo === 'utm33';
+  const color = isUtm ? '#34D399' : '#4A7CFF';
+  const utm = toUTM33(p.lat, p.lon);
+  
+  const icon = L.divIcon({
+    className:'',
+    html:`<div style="
+      width:${isUtm?16:14}px;height:${isUtm?16:14}px;
+      background:${color};border:2.5px solid white;border-radius:50%;
+      box-shadow:0 2px 6px rgba(0,0,0,0.4);
+    "></div>`,
+    iconSize:[isUtm?16:14,isUtm?16:14],
+    iconAnchor:[isUtm?8:7,isUtm?8:7]
+  });
+  
+  const badge = isUtm 
+    ? '<span class="popup-badge badge-utm">GIÀ UTM 33N</span>'
+    : '<span class="popup-badge badge-conv">CONVERTITO</span>';
+  
+  const popup = `
+    <div class="popup-name">${p.name}</div>
+    <div class="popup-prot">Prot. ${p.prot}</div>
+    <div class="popup-coords">
+      Lat: <span>${p.lat.toFixed(6)}</span><br>
+      Lon: <span>${p.lon.toFixed(6)}</span><br>
+      UTM 33N: <span>E ${utm.e} &nbsp;N ${utm.n}</span>
+    </div>
+    ${badge}
+  `;
+  
+  const m = L.marker([p.lat, p.lon], {icon}).bindPopup(popup);
+  m.addTo(map);
+  group.addLayer(m);
+  markers.push(m);
+});
+
+map.fitBounds(group.getBounds().pad(0.08));
+
+function fitAll() { map.fitBounds(group.getBounds().pad(0.08)); }
+</script>
+</body>
+</html>
